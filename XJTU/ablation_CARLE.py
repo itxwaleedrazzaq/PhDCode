@@ -1,0 +1,149 @@
+import tensorflow as tf
+import numpy as np
+from keras._tf_keras.keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint, Callback
+from keras._tf_keras.keras.models import Model,Sequential
+from keras._tf_keras.keras.layers import Input, Conv1D, GRU, Dense, Concatenate, Dropout, Softmax, GlobalAveragePooling1D, Conv2D, GlobalAveragePooling2D, Multiply,BatchNormalization,Activation,Bidirectional,LeakyReLU,GlobalMaxPooling1D,Attention,concatenate
+from keras._tf_keras.keras.regularizers import l2
+from sklearn.model_selection import KFold
+from keras._tf_keras.keras.optimizers import Adam
+import numpy as np
+from sklearn.model_selection import KFold
+import pandas as pd
+import math
+import pandas as pd
+import math
+import tensorflow as tf
+import tqdm  # For progress bar
+import tqdm  # For progress bar
+import tensorflow as tf
+import os
+import tensorflow as tf
+from keras._tf_keras.keras.layers import LayerNormalization, MultiHeadAttention, Add, Reshape, Lambda, Conv2D, BatchNormalization, Activation, MaxPooling2D, Flatten, Dense, Input, LSTM, Conv1D, MaxPooling1D, Concatenate,Resizing
+from keras._tf_keras.keras.models import Model
+from keras._tf_keras.keras.regularizers import l2
+from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+
+
+
+np.random.seed(100)
+
+input_shape = (14, 1)
+reg_strength = 0.001
+
+
+def CALE():
+    convH = Input(shape=input_shape)
+    convh1 = Conv1D(256, 3, padding='same', kernel_regularizer=l2(reg_strength))(convH)
+    convh1 = BatchNormalization()(convh1)
+    convh1 = Activation('relu')(convh1)
+    convh1 = MaxPooling1D(pool_size=1)(convh1)  
+    convh2 = Conv1D(256, 3, padding='same', kernel_regularizer=l2(reg_strength))(convh1)
+    convh2 = BatchNormalization()(convh2)
+    convh2 = Activation('relu')(convh2)
+    convh2 = MaxPooling1D(pool_size=1)(convh2)  
+    convh3 = Conv1D(128, 2, padding='same', kernel_regularizer=l2(reg_strength))(convh2)
+    convh3 = BatchNormalization()(convh3)
+    convh3 = Activation('relu')(convh3)
+    convh3 = MaxPooling1D(pool_size=1)(convh3)  
+    convh4 = Conv1D(64, 2, padding='same', kernel_regularizer=l2(reg_strength))(convh3)
+    convh4 = BatchNormalization()(convh4)
+    convh4 = Activation('relu')(convh4)
+    convh4 = MaxPooling1D(pool_size=1)(convh4)  
+    multi_head_attention_h = MultiHeadAttention(num_heads=8, key_dim=64)(convh4, convh4)
+    lstm1 = LSTM(64, activation='relu', stateful=False, return_sequences=True)(multi_head_attention_h)
+    multi_head_attention_h = MultiHeadAttention(num_heads=8, key_dim=64)(lstm1, lstm1)
+    lstm2 = LSTM(64, activation='relu', stateful=False, return_sequences=True)(multi_head_attention_h)
+    multi_head_attention_h = MultiHeadAttention(num_heads=8, key_dim=64)(lstm2, lstm2)
+    flat = Flatten()(multi_head_attention_h)
+    dense = Dense(128, activation='relu', kernel_regularizer=l2(reg_strength))(flat)
+    dense = Dense(64, activation='relu', kernel_regularizer=l2(reg_strength))(dense)
+    dense = Dense(32, activation='relu', kernel_regularizer=l2(reg_strength))(dense)
+    output = Dense(1)(dense)
+    model = Model(inputs=convH, outputs=output)
+    return model
+
+
+def CRLE():
+    convH = Input(shape=input_shape)
+    convh1 = Conv1D(256, 3, padding='same', kernel_regularizer=l2(reg_strength))(convH)
+    convh1 = BatchNormalization()(convh1)
+    convh1 = Activation('relu')(convh1)
+    convh1 = MaxPooling1D(pool_size=1)(convh1)
+    convH_adjusted = Conv1D(256, 1, padding='same', kernel_regularizer=l2(reg_strength))(convH)
+    res1 = Add()([convH_adjusted, convh1])
+    convh2 = Conv1D(256, 3, padding='same', kernel_regularizer=l2(reg_strength))(res1)
+    convh2 = BatchNormalization()(convh2)
+    convh2 = Activation('relu')(convh2)
+    convh2 = MaxPooling1D(pool_size=1)(convh2)  
+    res1_adjusted = Conv1D(256, 1, padding='same', kernel_regularizer=l2(reg_strength))(res1)
+    res2 = Add()([res1_adjusted, convh2])
+    convh3 = Conv1D(128, 2, padding='same', kernel_regularizer=l2(reg_strength))(res2)
+    convh3 = BatchNormalization()(convh3)
+    convh3 = Activation('relu')(convh3)
+    convh3 = MaxPooling1D(pool_size=1)(convh3) 
+    res2_adjusted = Conv1D(128, 1, padding='same', kernel_regularizer=l2(reg_strength))(res2)
+    res3 = Add()([res2_adjusted, convh3])
+    convh4 = Conv1D(64, 2, padding='same', kernel_regularizer=l2(reg_strength))(res3)
+    convh4 = BatchNormalization()(convh4)
+    convh4 = Activation('relu')(convh4)
+    convh4 = MaxPooling1D(pool_size=1)(convh4) 
+    res3_adjusted = Conv1D(64, 1, padding='same', kernel_regularizer=l2(reg_strength))(res3)
+    res4 = Add()([res3_adjusted, convh4])
+    lstm1 = LSTM(64, activation='relu', stateful=False, return_sequences=True)(res4)
+    res5 = Add()([res4, lstm1])
+    lstm2 = LSTM(64, activation='relu', stateful=False, return_sequences=True)(res5)
+    res6 = Add()([res5, lstm2])
+    flat = Flatten()(res6)
+    dense = Dense(128, activation='relu', kernel_regularizer=l2(reg_strength))(flat)
+    dense = Dense(64, activation='relu', kernel_regularizer=l2(reg_strength))(dense)
+    dense = Dense(32, activation='relu', kernel_regularizer=l2(reg_strength))(dense)
+    output = Dense(1)(dense)
+    model = Model(inputs=convH, outputs=output)
+    return model
+
+
+
+def CARLE():
+    convH = Input(shape=input_shape)
+    convh1 = Conv1D(256, 3, padding='same', kernel_regularizer=l2(reg_strength))(convH)
+    convh1 = BatchNormalization()(convh1)
+    convh1 = Activation('relu')(convh1)
+    convh1 = MaxPooling1D(pool_size=1)(convh1)  
+    convH_adjusted = Conv1D(256, 1, padding='same', kernel_regularizer=l2(reg_strength))(convH)
+    res1 = Add()([convH_adjusted, convh1])
+    convh2 = Conv1D(256, 3, padding='same', kernel_regularizer=l2(reg_strength))(res1)
+    convh2 = BatchNormalization()(convh2)
+    convh2 = Activation('relu')(convh2)
+    convh2 = MaxPooling1D(pool_size=1)(convh2)  
+    res1_adjusted = Conv1D(256, 1, padding='same', kernel_regularizer=l2(reg_strength))(res1)
+    res2 = Add()([res1_adjusted, convh2])
+    convh3 = Conv1D(128, 2, padding='same', kernel_regularizer=l2(reg_strength))(res2)
+    convh3 = BatchNormalization()(convh3)
+    convh3 = Activation('relu')(convh3)
+    convh3 = MaxPooling1D(pool_size=1)(convh3)  
+    res2_adjusted = Conv1D(128, 1, padding='same', kernel_regularizer=l2(reg_strength))(res2)
+    res3 = Add()([res2_adjusted, convh3])
+    convh4 = Conv1D(64, 2, padding='same', kernel_regularizer=l2(reg_strength))(res3)
+    convh4 = BatchNormalization()(convh4)
+    convh4 = Activation('relu')(convh4)
+    convh4 = MaxPooling1D(pool_size=1)(convh4)  
+    res3_adjusted = Conv1D(64, 1, padding='same', kernel_regularizer=l2(reg_strength))(res3)
+    res4 = Add()([res3_adjusted, convh4])
+    multi_head_attention_h = MultiHeadAttention(num_heads=8, key_dim=64)(res4, res4)
+    lstm1 = LSTM(64, activation='relu', stateful=False, return_sequences=True)(multi_head_attention_h)
+    multi_head_attention_h = MultiHeadAttention(num_heads=8, key_dim=64)(lstm1, lstm1)
+    res5 = Add()([multi_head_attention_h, lstm1])
+    lstm2 = LSTM(64, activation='relu', stateful=False, return_sequences=True)(res5)
+    multi_head_attention_h = MultiHeadAttention(num_heads=8, key_dim=64)(lstm2, lstm2)
+    res6 = Add()([res5, multi_head_attention_h])
+    flat = Flatten()(res6)
+    dense = Dense(128, activation='relu', kernel_regularizer=l2(reg_strength))(flat)
+    dense = Dense(64, activation='relu', kernel_regularizer=l2(reg_strength))(dense)
+    dense = Dense(32, activation='relu', kernel_regularizer=l2(reg_strength))(dense)
+    output = Dense(1)(dense)
+    model = Model(inputs=convH, outputs=output)
+    return model
